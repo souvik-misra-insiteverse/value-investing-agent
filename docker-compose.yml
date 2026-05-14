@@ -1,0 +1,14 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: value_agent_postgres
+    environment:
+      POSTGRES_DB: value_agent
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - value_agent_pgdata:/var/lib/postgresql/data
+volumes:
+  value_agent_pgdata:
