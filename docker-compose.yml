@@ -12,7 +12,7 @@ services:
       - value_agent_pgdata:/var/lib/postgresql/data
 
   langfuse:
-    image: langfuse/langfuse:3
+    image: langfuse/langfuse:2
     container_name: value_agent_langfuse
     depends_on:
       - postgres
