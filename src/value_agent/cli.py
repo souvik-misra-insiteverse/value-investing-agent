@@ -17,6 +17,8 @@ from .prompt_optimizer import PromptFeedback, maybe_optimize_and_persist_prompt
 from .prompt_store import PromptRecord, load_or_bootstrap_active_prompt
 from .prompts import DEFAULT_SYSTEM_PROMPT
 from .llm_judge import judge_report
+# pyrefly: ignore [missing-import]
+from langfuse.langchain import CallbackHandler
 
 console = Console()
 
@@ -65,15 +67,7 @@ async def async_main() -> None:
         },
     }
 
-    from langfuse.callback import CallbackHandler
-
-    langfuse_handler = CallbackHandler(
-        public_key=os.getenv("LANGFUSE_PUBLIC_KEY", "pk-lf-1234567890"),
-        secret_key=os.getenv("LANGFUSE_SECRET_KEY", "sk-lf-1234567890"),
-        host=os.getenv("LANGFUSE_HOST", "http://localhost:3000"),
-        session_id=thread_id,
-        tags=config["tags"]
-    )
+    langfuse_handler = CallbackHandler()
     config["callbacks"] = [langfuse_handler]
 
     async with make_app(settings, system_prompt=active_prompt.prompt_text) as app:
