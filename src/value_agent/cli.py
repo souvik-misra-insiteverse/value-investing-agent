@@ -65,18 +65,19 @@ async def async_main() -> None:
         },
     }
 
-    import langsmith as ls
+    from langfuse.callback import CallbackHandler
 
-    project_name = os.getenv("LANGSMITH_PROJECT", "value-investing-agent")
-    tracing_enabled = os.getenv("LANGSMITH_TRACING", "false").lower() == "true"
+    langfuse_handler = CallbackHandler(
+        public_key=os.getenv("LANGFUSE_PUBLIC_KEY", "pk-lf-1234567890"),
+        secret_key=os.getenv("LANGFUSE_SECRET_KEY", "sk-lf-1234567890"),
+        host=os.getenv("LANGFUSE_HOST", "http://localhost:3000"),
+        session_id=thread_id,
+        tags=config["tags"]
+    )
+    config["callbacks"] = [langfuse_handler]
+
     async with make_app(settings, system_prompt=active_prompt.prompt_text) as app:
-        with ls.tracing_context(
-            project_name=project_name,
-            enabled=tracing_enabled,
-            tags=config["tags"],
-            metadata=config["metadata"],
-        ):
-            result = await app.ainvoke(initial_state, config=config)
+        result = await app.ainvoke(initial_state, config=config)
 
     console.rule(f"{initial_state['ticker']} value screen")
     console.print(result["report"])

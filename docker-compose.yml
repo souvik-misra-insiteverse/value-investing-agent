@@ -10,5 +10,21 @@ services:
       - "5433:5432"
     volumes:
       - value_agent_pgdata:/var/lib/postgresql/data
+
+  langfuse:
+    image: langfuse/langfuse:3
+    container_name: value_agent_langfuse
+    depends_on:
+      - postgres
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/value_agent
+      - NEXTAUTH_SECRET=mysecret
+      - SALT=mysalt
+      - NEXTAUTH_URL=http://localhost:3000
+      - TELEMETRY_ENABLED=false
+
 volumes:
   value_agent_pgdata:
+
