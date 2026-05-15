@@ -56,11 +56,7 @@ def build_graph(
 
     async def load_memory(state: ValueAgentState, config: RunnableConfig) -> ValueAgentState:
         ticker = state["ticker"].upper().strip()
-        memories = await memory_manager.asearch(
-            query=f"value investing screening preferences, feedback, thresholds, and prior notes for {ticker}",
-            config=config,
-        )
-        return {"ticker": ticker, "memories": [str(m) for m in memories]}
+        return {"ticker": ticker, "memories": []}
 
     async def fetch_sec(state: ValueAgentState) -> ValueAgentState:
         cik, company_name = await sec_client.lookup_cik(state["ticker"])
@@ -113,24 +109,6 @@ def build_graph(
         return {"report": str(response.content)}
 
     async def remember(state: ValueAgentState, config: RunnableConfig) -> ValueAgentState:
-        user_msg = {
-            "role": "user",
-            "content": f"Screen ticker {state['ticker']} for value-investing eligibility.",
-        }
-        assistant_msg = {
-            "role": "assistant",
-            "content": json.dumps(
-                {
-                    "ticker": state["ticker"],
-                    "company_name": state.get("company_name"),
-                    "decision": state.get("analysis", {}).get("decision"),
-                    "allocation": state.get("analysis", {}).get("allocation"),
-                    "report_summary": state.get("report", "")[:3000],
-                },
-                default=str,
-            ),
-        }
-        await memory_manager.ainvoke({"messages": [user_msg, assistant_msg]}, config=config)
         return {}
 
     builder = StateGraph(ValueAgentState)
@@ -159,10 +137,8 @@ async def make_app(settings: Settings, *, system_prompt: str) -> AsyncIterator[A
     """Create a graph with Postgres-backed checkpoints and long-term memory store."""
     async with AsyncPostgresSaver.from_conn_string(settings.database_url) as checkpointer:
         await checkpointer.setup()
-        embedding = init_embeddings(settings.embedding_model)
         async with AsyncPostgresStore.from_conn_string(
             settings.database_url,
-            index={"dims": 1536, "embed": embedding},
         ) as store:
             await store.setup()
             yield build_graph(settings, checkpointer=checkpointer, store=store, system_prompt=system_prompt)
