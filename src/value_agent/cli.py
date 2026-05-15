@@ -56,9 +56,11 @@ async def async_main() -> None:
         "portfolio_value": settings.default_portfolio_value,
     }
     config = {
+        "run_name": thread_id,
         "configurable": {"thread_id": thread_id},
         "tags": ["value-investing", "screening", initial_state["ticker"]],
         "metadata": {
+            "langfuse_session_id": thread_id,
             "ticker": initial_state["ticker"],
             "thread_id": thread_id,
             "portfolio_value": settings.default_portfolio_value,
