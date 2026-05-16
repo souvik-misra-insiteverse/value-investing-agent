@@ -17,6 +17,8 @@ from .prompt_optimizer import PromptFeedback, maybe_optimize_and_persist_prompt
 from .prompt_store import PromptRecord, load_or_bootstrap_active_prompt
 from .prompts import DEFAULT_SYSTEM_PROMPT
 from .llm_judge import judge_report
+from langgraph.store.postgres import AsyncPostgresStore
+from langchain.embeddings import init_embeddings
 # pyrefly: ignore [missing-import]
 from langfuse.langchain import CallbackHandler
 
@@ -77,6 +79,9 @@ async def async_main() -> None:
 
     console.rule(f"{initial_state['ticker']} value screen")
     console.print(result["report"])
+    if "final_prompt" in result:
+        console.rule("final prompt used (RAG)")
+        console.print(result["final_prompt"])
     console.rule("run metadata")
     console.print(
         {
@@ -132,6 +137,21 @@ async def async_main() -> None:
                 "reason": update_result.reason,
             }
         )
+
+    if judge_result.score > 0.97 and judge_result.format_valid:
+        embedding = init_embeddings(settings.embedding_model)
+        async with AsyncPostgresStore.from_conn_string(
+            settings.database_url,
+            index={"dims": 384, "embed": embedding},
+        ) as store:
+            await store.setup()
+            await store.aput(
+                namespace=("golden_examples",),
+                key=initial_state["ticker"],
+                value={"context": result.get("context_pack", ""), "report": result.get("report", "")}
+            )
+        console.rule("few-shot store")
+        console.print(f"Saved {initial_state['ticker']} as a golden example for future RAG.")
 
 
 def main() -> None:

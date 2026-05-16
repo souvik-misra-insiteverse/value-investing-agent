@@ -34,6 +34,7 @@ class ValueAgentState(TypedDict, total=False):
     context_pack: str
     report: str
     warnings: list[str]
+    final_prompt: str
 
 
 def build_graph(
@@ -104,13 +105,27 @@ def build_graph(
         return {"context_pack": context_pack}
 
     async def synthesize(state: ValueAgentState) -> ValueAgentState:
-        response = await llm.ainvoke(
-            [
-                SystemMessage(content=system_prompt),
-                HumanMessage(content=state["context_pack"]),
-            ]
+        # Retrieve Few-Shot Golden Examples
+        few_shot_results = await store.asearch(
+            ("golden_examples",),
+            query=state["context_pack"],
+            limit=2,
         )
-        return {"report": str(response.content)}
+        few_shot_examples = [r.value for r in few_shot_results]
+
+        messages = [SystemMessage(content=system_prompt)]
+        for ex in few_shot_examples:
+            messages.append(HumanMessage(content=f"Example Input Context:\n{ex['context']}"))
+            messages.append(SystemMessage(content=f"Example Output Report:\n{ex['report']}"))
+
+        messages.append(HumanMessage(content=state["context_pack"]))
+
+        response = await llm.ainvoke(messages)
+        
+        final_prompt_str = "\n\n========================\n\n".join(
+            f"{m.type.upper()}:\n{m.content}" for m in messages
+        )
+        return {"report": str(response.content), "final_prompt": final_prompt_str}
 
     async def remember(state: ValueAgentState, config: RunnableConfig) -> ValueAgentState:
         user_msg = {
