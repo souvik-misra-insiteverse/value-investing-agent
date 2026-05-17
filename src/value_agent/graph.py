@@ -6,7 +6,7 @@ from typing import Any, AsyncIterator, Optional, TypedDict
 
 from langchain.chat_models import init_chat_model
 from langchain.embeddings import init_embeddings
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.graph import END, START, StateGraph
@@ -116,7 +116,7 @@ def build_graph(
         messages = [SystemMessage(content=system_prompt)]
         for ex in few_shot_examples:
             messages.append(HumanMessage(content=f"Example Input Context:\n{ex['context']}"))
-            messages.append(SystemMessage(content=f"Example Output Report:\n{ex['report']}"))
+            messages.append(AIMessage(content=f"Example Output Report:\n{ex['report']}"))
 
         messages.append(HumanMessage(content=state["context_pack"]))
 
