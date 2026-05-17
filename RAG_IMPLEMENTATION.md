@@ -50,6 +50,70 @@ messages.append(HumanMessage(content=state["context_pack"]))
 
 By framing the retrieved examples as past interaction turns (`HumanMessage` -> `SystemMessage`), the active LLM immediately recognizes the precise structure, tone, and logic required to solve the current task, resulting in near-perfect adherence to formatting rules and score logic without modifying the base instructions.
 
+### 4. Final Prompt Representation
+When evaluating a ticker (e.g. `MSFT`) using a retrieved Golden Example (e.g. `AAPL`), the final prompt payload sent to the LLM essentially looks like this:
+
+```text
+SYSTEM:
+You are a conservative value-investing screening agent.
+
+## Grounding Rule
+Every number you write MUST appear verbatim in the deterministic metrics provided in the
+context...
+(rest of zero-shot base instructions)
+
+========================
+
+HUMAN:
+Example Input Context:
+## Prior thread memories
+None
+
+## Deterministic analysis JSON
+{
+  "ticker": "AAPL",
+  "company_name": "Apple Inc.",
+  "analysis": {
+    "decision": "Eligible",
+    "score": 100
+  }
+}
+## Compact annual fundamentals
+FY | Revenue | Net income | Assets | Liabilities | Equity | ...
+
+========================
+
+SYSTEM:
+Example Output Report:
+------------------------------ AAPL value screen ------------------------------
+1. **Verdict** – **Eligible**, score **100**.
+
+2. **10-Year Business Performance** – Apple Inc. has been profitable in **10/10** 
+available years and generated positive operating cash flow in **10/10** 
+available years...
+
+3. **Valuation** –  
+   - **P/E:** **14.82** ...
+(rest of perfect AAPL report)
+
+========================
+
+HUMAN:
+## Prior thread memories
+None
+
+## Deterministic analysis JSON
+{
+  "ticker": "MSFT",
+  "company_name": "Microsoft Corp.",
+  "analysis": {
+    "decision": "Not eligible",
+    "score": 75
+  }
+}
+## Compact annual fundamentals
+FY | Revenue | Net income | Assets | Liabilities | Equity | ...
+```
 ## Inspecting the Data
 To view the stored Golden Examples directly in Postgres, run the following SQL query:
 
