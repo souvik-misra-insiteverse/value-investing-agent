@@ -17,6 +17,10 @@ from .prompt_optimizer import PromptFeedback, maybe_optimize_and_persist_prompt
 from .prompt_store import PromptRecord, load_or_bootstrap_active_prompt
 from .prompts import DEFAULT_SYSTEM_PROMPT
 from .llm_judge import judge_report
+from langgraph.store.postgres import AsyncPostgresStore
+from langchain.embeddings import init_embeddings
+# pyrefly: ignore [missing-import]
+from langfuse.langchain import CallbackHandler
 
 console = Console()
 
@@ -54,9 +58,11 @@ async def async_main() -> None:
         "portfolio_value": settings.default_portfolio_value,
     }
     config = {
+        "run_name": thread_id,
         "configurable": {"thread_id": thread_id},
         "tags": ["value-investing", "screening", initial_state["ticker"]],
         "metadata": {
+            "langfuse_session_id": thread_id,
             "ticker": initial_state["ticker"],
             "thread_id": thread_id,
             "portfolio_value": settings.default_portfolio_value,
@@ -65,21 +71,17 @@ async def async_main() -> None:
         },
     }
 
-    import langsmith as ls
+    langfuse_handler = CallbackHandler()
+    config["callbacks"] = [langfuse_handler]
 
-    project_name = os.getenv("LANGSMITH_PROJECT", "value-investing-agent")
-    tracing_enabled = os.getenv("LANGSMITH_TRACING", "false").lower() == "true"
     async with make_app(settings, system_prompt=active_prompt.prompt_text) as app:
-        with ls.tracing_context(
-            project_name=project_name,
-            enabled=tracing_enabled,
-            tags=config["tags"],
-            metadata=config["metadata"],
-        ):
-            result = await app.ainvoke(initial_state, config=config)
+        result = await app.ainvoke(initial_state, config=config)
 
     console.rule(f"{initial_state['ticker']} value screen")
     console.print(result["report"])
+    if "final_prompt" in result:
+        console.rule("final prompt used (RAG)")
+        console.print(result["final_prompt"])
     console.rule("run metadata")
     console.print(
         {
@@ -135,6 +137,21 @@ async def async_main() -> None:
                 "reason": update_result.reason,
             }
         )
+
+    if judge_result.score > 0.97 and judge_result.format_valid:
+        embedding = init_embeddings(settings.embedding_model)
+        async with AsyncPostgresStore.from_conn_string(
+            settings.database_url,
+            index={"dims": 384, "embed": embedding},
+        ) as store:
+            await store.setup()
+            await store.aput(
+                namespace=("golden_examples",),
+                key=initial_state["ticker"],
+                value={"context": result.get("context_pack", ""), "report": result.get("report", "")}
+            )
+        console.rule("few-shot store")
+        console.print(f"Saved {initial_state['ticker']} as a golden example for future RAG.")
 
 
 def main() -> None:
